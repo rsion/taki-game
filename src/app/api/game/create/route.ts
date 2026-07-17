@@ -1,13 +1,6 @@
 import { NextResponse } from 'next/server';
-
-function generateRoomCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = '';
-  for (let i = 0; i < 4; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
-}
+import { createInitialGameState, addPlayer } from '@/lib/game-logic';
+import { saveGame, generateRoomCode } from '@/lib/game-store';
 
 export async function POST(request: Request) {
   try {
@@ -18,6 +11,11 @@ export async function POST(request: Request) {
 
     const code = generateRoomCode();
     const playerId = crypto.randomUUID();
+
+    // Create game state and add host as first player
+    let state = createInitialGameState(code, playerId);
+    state = addPlayer(state, playerId, playerName.trim());
+    await saveGame(code, state);
 
     return NextResponse.json({
       code,
