@@ -7,7 +7,7 @@ export async function GET(
   { params }: { params: { code: string } }
 ) {
   try {
-    const code = params.code.toUpperCase();
+    const code = params.code;
     const playerId = request.nextUrl.searchParams.get('playerId');
 
     const state = await loadGame(code);

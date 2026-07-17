@@ -9,7 +9,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Player name and room code required' }, { status: 400 });
     }
 
-    const roomCode = code.toUpperCase();
+    const roomCode = code.trim();
     const playerId = crypto.randomUUID();
 
     // Load existing game, add player, save and broadcast

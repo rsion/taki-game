@@ -116,11 +116,13 @@ export default function Home() {
                 <label className="block text-white/70 text-sm mb-1">Room Code</label>
                 <input
                   type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={roomCode}
-                  onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-                  placeholder="ABCD"
-                  maxLength={4}
-                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/40 text-2xl text-center tracking-[0.5em] font-mono uppercase"
+                  onChange={(e) => setRoomCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="123456"
+                  maxLength={6}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/40 text-2xl text-center tracking-[0.5em] font-mono"
                 />
               </div>
             )}

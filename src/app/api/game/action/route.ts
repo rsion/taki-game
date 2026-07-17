@@ -21,7 +21,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing code, playerId, or action' }, { status: 400 });
     }
 
-    let state = await loadGame(code.toUpperCase());
+    let state = await loadGame(code);
     if (!state) {
       return NextResponse.json({ error: 'Game not found' }, { status: 404 });
     }
@@ -53,8 +53,8 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Unknown action type' }, { status: 400 });
     }
 
-    await saveGame(code.toUpperCase(), state);
-    await broadcastState(code.toUpperCase(), state);
+    await saveGame(code, state);
+    await broadcastState(code, state);
 
     return NextResponse.json({ success: true, status: state.status });
   } catch (err: any) {

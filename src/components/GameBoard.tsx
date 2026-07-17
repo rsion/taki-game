@@ -189,7 +189,7 @@ export default function GameBoard({
                 : 'opacity-70'
             }`}
           >
-            <CardBack />
+            <CardBack large />
             <div className="absolute inset-0 flex items-center justify-center">
               <span className="bg-black/50 text-white text-xs font-bold px-2 py-1 rounded">
                 {gameState.deck.length}
@@ -205,7 +205,7 @@ export default function GameBoard({
 
         {/* Discard pile */}
         <div className="flex flex-col items-center gap-2">
-          {topCard && <Card card={topCard} />}
+          {topCard && <Card card={topCard} large />}
           {/* Active color indicator */}
           {gameState.activeColor && (
             <div className={`px-3 py-1 rounded-full border text-xs font-bold text-white ${COLOR_BG[gameState.activeColor] || ''}`}>

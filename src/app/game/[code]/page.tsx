@@ -7,7 +7,7 @@ import * as logic from '@/lib/game-logic';
 import GameBoard from '@/components/GameBoard';
 
 export default function GamePage({ params }: { params: { code: string } }) {
-  const code = params.code.toUpperCase();
+  const code = params.code;
 
   const [playerId, setPlayerId] = useState<string>('');
   const [isHost, setIsHost] = useState(false);
