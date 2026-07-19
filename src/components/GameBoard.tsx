@@ -2,7 +2,7 @@
 
 import { GameState, CardColor } from '@/lib/types';
 import { canPlayCard } from '@/lib/game-logic';
-import Card, { CardBack } from './Card';
+import Card, { CardBack, cardPoints } from './Card';
 import ColorPicker from './ColorPicker';
 
 const COLOR_BG: Record<string, string> = {
@@ -99,29 +99,122 @@ export default function GameBoard({
     );
   }
 
-  // FINISHED
+  // FINISHED — match official Taki "סיכום משחק" design
   if (gameState.status === 'finished') {
-    const winner = gameState.players.find(p => p.id === gameState.winnerId);
-    const isWinner = gameState.winnerId === playerId;
+    // Calculate scores: winner gets sum of all opponents' remaining card point values
+    const scores = gameState.players.map(p => {
+      if (p.id === gameState.winnerId) {
+        // Winner gets points from all other players' remaining cards
+        return gameState.players
+          .filter(op => op.id !== p.id)
+          .reduce((sum, op) => sum + op.cards.reduce((cs, c) => cs + cardPoints(c), 0), 0);
+      }
+      return 0;
+    });
+
+    // Sort by score descending
+    const ranked = gameState.players
+      .map((p, i) => ({ ...p, score: scores[i] }))
+      .sort((a, b) => b.score - a.score);
+
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-8 w-full max-w-md shadow-2xl border border-white/20 text-center">
-          <div className="text-6xl mb-4">{isWinner ? '🎉' : '😮'}</div>
-          <h2 className="text-3xl font-bold text-white mb-2">
-            {isWinner ? 'You Win!' : `${winner?.name || 'Someone'} Wins!`}
+        <div style={{
+          background: 'linear-gradient(180deg, #1A6FA0 0%, #154C72 100%)',
+          border: '2px solid #3498DB',
+          borderRadius: 20,
+          padding: '32px 24px 24px',
+          width: '100%',
+          maxWidth: 420,
+          boxShadow: '0 0 30px rgba(52,152,219,0.3), 0 8px 32px rgba(0,0,0,0.4)',
+        }}>
+          <h2 style={{
+            color: '#FFFFFF',
+            fontSize: 28,
+            fontWeight: 800,
+            textAlign: 'center',
+            marginBottom: 24,
+            fontFamily: "'Arial Black', sans-serif",
+            textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+          }}>
+            סיכום משחק
           </h2>
-          <p className="text-white/60 mb-6">
-            {isWinner ? 'Congratulations! You got rid of all your cards!' : 'Better luck next time!'}
-          </p>
-          <button
-            onClick={() => {
-              sessionStorage.clear();
-              window.location.href = '/';
-            }}
-            className="w-full py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-bold rounded-xl hover:from-blue-600 hover:to-cyan-600 transition-all"
-          >
-            Play Again
-          </button>
+
+          <div style={{ marginBottom: 24 }}>
+            {ranked.map((p, i) => (
+              <div
+                key={p.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 16px',
+                  backgroundColor: i % 2 === 0 ? 'rgba(255,255,255,0.12)' : 'transparent',
+                  borderRadius: 8,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 16, fontWeight: 700, minWidth: 20 }}>
+                    {i + 1}
+                  </span>
+                  <span style={{ color: '#FFFFFF', fontSize: 18, fontWeight: 600 }}>
+                    {p.name} {p.id === playerId ? '(you)' : ''}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                  <span style={{ color: '#FFFFFF', fontSize: 22, fontWeight: 800 }}>
+                    {p.score}
+                  </span>
+                  <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 14 }}>
+                    נק&apos;
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <button
+              onClick={() => {
+                sessionStorage.clear();
+                window.location.href = '/';
+              }}
+              style={{
+                background: 'linear-gradient(180deg, #5FD35F 0%, #3CB43C 100%)',
+                color: '#FFFFFF',
+                fontWeight: 800,
+                fontSize: 18,
+                padding: '14px 32px',
+                borderRadius: 30,
+                border: '2px solid #2E8B2E',
+                cursor: 'pointer',
+                boxShadow: '0 3px 8px rgba(0,0,0,0.3)',
+                fontFamily: "'Arial Black', sans-serif",
+              }}
+            >
+              שחק שוב
+            </button>
+            <button
+              onClick={() => {
+                sessionStorage.clear();
+                window.location.href = '/';
+              }}
+              style={{
+                background: 'linear-gradient(180deg, #E74C3C 0%, #C0392B 100%)',
+                color: '#FFFFFF',
+                fontWeight: 800,
+                fontSize: 18,
+                padding: '14px 32px',
+                borderRadius: 30,
+                border: '2px solid #A93226',
+                cursor: 'pointer',
+                boxShadow: '0 3px 8px rgba(0,0,0,0.3)',
+                fontFamily: "'Arial Black', sans-serif",
+              }}
+            >
+              תפריט
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -234,8 +327,15 @@ export default function GameBoard({
         </div>
       )}
 
-      {/* My hand */}
-      <div className={`px-2 pb-4 pt-2 bg-black/30 border-t border-white/10 ${isMyTurn ? 'ring-2 ring-green-500/50 ring-inset' : ''}`}>
+      {/* My hand — green shelf */}
+      <div
+        className={`px-2 pb-4 pt-3 border-t border-white/10 ${isMyTurn ? 'ring-2 ring-green-400/60 ring-inset' : ''}`}
+        style={{
+          background: 'linear-gradient(180deg, #4CAF50 0%, #2E7D32 40%, #1B5E20 100%)',
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
+        }}
+      >
         <div
           className="overflow-x-auto pb-2 -mx-2 px-2"
           style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'thin' }}

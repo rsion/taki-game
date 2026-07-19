@@ -2,48 +2,41 @@
 
 import { Card as CardType } from '@/lib/types';
 
-const COLOR_HEX: Record<string, string> = {
-  red: '#E53935',
-  blue: '#1E88E5',
-  green: '#43A047',
-  yellow: '#F9A825',
+/* ── Palette ─────────────────────────────────────────────── */
+const PAL: Record<string, { m: string; d: string; s: string }> = {
+  red:    { m: '#C0392B', d: '#922B21', s: '#641E16' },
+  blue:   { m: '#2980B9', d: '#1F618D', s: '#154360' },
+  green:  { m: '#27AE60', d: '#1E8449', s: '#145A32' },
+  yellow: { m: '#F1C40F', d: '#B7950B', s: '#7D6608' },
 };
+const WILD = { m: '#8E44AD', d: '#6C3483', s: '#4A235A' };
+const TAKI_COLORS = ['#E74C3C', '#3498DB', '#2ECC71', '#F1C40F'];
 
-const COLOR_LIGHT: Record<string, string> = {
-  red: '#FFCDD2',
-  blue: '#BBDEFB',
-  green: '#C8E6C9',
-  yellow: '#FFF9C4',
-};
-
-const COLOR_DARK: Record<string, string> = {
-  red: '#B71C1C',
-  blue: '#0D47A1',
-  green: '#1B5E20',
-  yellow: '#F57F17',
-};
-
-function getActionSymbol(type: string): { label: string; fontSize: string } {
-  switch (type) {
-    case 'taki':
-      return { label: 'TAKI', fontSize: 'text-2xl sm:text-3xl' };
-    case 'super_taki':
-      return { label: 'TAKI', fontSize: 'text-xl sm:text-2xl' };
-    case 'plus':
-      return { label: '+', fontSize: 'text-5xl sm:text-6xl' };
-    case 'stop':
-      return { label: '✋', fontSize: 'text-4xl sm:text-5xl' };
-    case 'change_direction':
-      return { label: '⇄', fontSize: 'text-4xl sm:text-5xl' };
-    case 'draw_two':
-      return { label: '+2', fontSize: 'text-3xl sm:text-4xl' };
-    case 'change_color':
-      return { label: '🎨', fontSize: 'text-4xl sm:text-5xl' };
-    default:
-      return { label: '?', fontSize: 'text-3xl' };
-  }
+/* ── Helpers ─────────────────────────────────────────────── */
+function extrude(color: string, n: number) {
+  const s: string[] = [];
+  for (let i = 1; i <= n; i++) s.push(`${i}px ${i}px 0 ${color}`);
+  s.push(`${n + 1}px ${n + 1}px ${n * 2}px rgba(0,0,0,0.22)`);
+  return s.join(', ');
 }
 
+function cardPoints(card: CardType): number {
+  if (card.type === 'number') return card.value ?? 0;
+  if (card.type === 'change_color') return 20;
+  if (card.type === 'super_taki') return 30;
+  return 10;
+}
+
+export { cardPoints };
+
+/* ── Sizes ───────────────────────────────────────────────── */
+function dims(small: boolean, large: boolean) {
+  if (small) return { w: 50, h: 70, r: 7, bw: 2, cFs: 24, crFs: 8, depth: 1, pad: 3 };
+  if (large) return { w: 130, h: 182, r: 14, bw: 3, cFs: 68, crFs: 16, depth: 4, pad: 8 };
+  return { w: 90, h: 126, r: 10, bw: 2.5, cFs: 44, crFs: 11, depth: 3, pad: 5 };
+}
+
+/* ── Card props ──────────────────────────────────────────── */
 interface CardProps {
   card: CardType;
   playable?: boolean;
@@ -53,193 +46,174 @@ interface CardProps {
 }
 
 export default function Card({ card, playable = false, small = false, large = false, onClick }: CardProps) {
-  const color = card.color;
-  const isWild = !color;
-  const hex = color ? COLOR_HEX[color] : '#7B1FA2';
-  const lightHex = color ? COLOR_LIGHT[color] : '#E1BEE7';
-  const darkHex = color ? COLOR_DARK[color] : '#4A148C';
+  const p = card.color ? PAL[card.color] : WILD;
+  const { w, h, r, bw, cFs, crFs, depth, pad } = dims(small, large);
+  const isWild = !card.color;
 
-  // Size classes
-  const sizeClass = small
-    ? 'w-[52px] h-[74px] rounded-lg'
-    : large
-    ? 'w-[120px] h-[170px] sm:w-[140px] sm:h-[196px] rounded-2xl'
-    : 'w-[85px] h-[120px] sm:w-[100px] sm:h-[140px] rounded-xl';
+  /* Determine background: TAKI/Plus/Stop cards get colored bg */
+  const coloredBg = ['taki', 'plus', 'stop', 'change_direction'].includes(card.type);
+  const bg = coloredBg ? p.m : isWild ? '#EDE7F6' : '#FEFEFE';
+  const txt = coloredBg ? '#FFF' : p.m;
+  const shadowColor = coloredBg ? 'rgba(0,0,0,0.35)' : p.s;
 
-  const cornerSize = small ? 'text-[8px]' : large ? 'text-base sm:text-lg' : 'text-[11px] sm:text-xs';
+  const font: React.CSSProperties = {
+    fontWeight: 900,
+    fontFamily: "'Arial Black', 'Impact', sans-serif",
+    lineHeight: 1,
+  };
 
-  // Build the center content
-  let centerContent: React.ReactNode;
-  let cornerLabel: string;
+  /* ── Corner + center ───────────────────────────────────── */
+  let corner: string;
+  let center: React.ReactNode;
 
   if (card.type === 'number') {
-    const numStr = String(card.value);
-    cornerLabel = numStr;
-    centerContent = (
-      <span
-        className={`font-black leading-none ${small ? 'text-2xl' : large ? 'text-7xl sm:text-8xl' : 'text-4xl sm:text-5xl'}`}
-        style={{
-          color: hex,
-          textShadow: `2px 2px 0 ${darkHex}, -1px -1px 0 ${lightHex}, 3px 3px 6px rgba(0,0,0,0.15)`,
-          fontFamily: "'Arial Black', 'Impact', sans-serif",
-        }}
-      >
-        {numStr}
+    corner = String(card.value);
+    center = (
+      <span style={{ ...font, fontSize: cFs, color: txt, textShadow: extrude(shadowColor, depth) }}>
+        {corner}
+      </span>
+    );
+  } else if (card.type === 'draw_two') {
+    corner = '+2';
+    center = (
+      <span style={{ ...font, fontSize: cFs * 0.85, color: txt, textShadow: extrude(shadowColor, depth) }}>
+        +2
       </span>
     );
   } else if (card.type === 'taki') {
-    cornerLabel = 'TAKI';
-    const { fontSize } = getActionSymbol('taki');
-    centerContent = (
-      <div className="flex flex-col items-center">
-        <span
-          className={`font-black tracking-tight leading-none ${small ? 'text-[10px]' : fontSize}`}
-          style={{
-            color: hex,
-            textShadow: `1px 1px 0 ${darkHex}, 2px 2px 4px rgba(0,0,0,0.2)`,
-            fontFamily: "'Arial Black', 'Impact', sans-serif",
-          }}
-        >
-          TA
-        </span>
-        <span
-          className={`font-black tracking-tight leading-none ${small ? 'text-[10px]' : fontSize}`}
-          style={{
-            color: hex,
-            textShadow: `1px 1px 0 ${darkHex}, 2px 2px 4px rgba(0,0,0,0.2)`,
-            fontFamily: "'Arial Black', 'Impact', sans-serif",
-          }}
-        >
-          KI
-        </span>
+    corner = 'T';
+    const sz = small ? 11 : large ? 28 : 19;
+    center = (
+      <div style={{ display: 'flex', gap: 1 }}>
+        {'TAKI'.split('').map((l, i) => (
+          <span key={i} style={{ ...font, fontSize: sz, color: TAKI_COLORS[i], textShadow: '1px 1px 0 rgba(0,0,0,0.4), 2px 2px 3px rgba(0,0,0,0.2)' }}>{l}</span>
+        ))}
       </div>
     );
   } else if (card.type === 'super_taki') {
-    cornerLabel = '★';
-    centerContent = (
-      <div className="flex flex-col items-center">
-        <div className={`flex ${small ? 'text-[8px]' : 'text-lg sm:text-xl'}`} style={{ fontFamily: "'Arial Black', 'Impact', sans-serif" }}>
-          <span style={{ color: '#E53935', filter: 'drop-shadow(1px 1px 1px rgba(0,0,0,0.3))' }} className="font-black">T</span>
-          <span style={{ color: '#F9A825', filter: 'drop-shadow(1px 1px 1px rgba(0,0,0,0.3))' }} className="font-black">A</span>
-        </div>
-        <div className={`flex ${small ? 'text-[8px]' : 'text-lg sm:text-xl'}`} style={{ fontFamily: "'Arial Black', 'Impact', sans-serif" }}>
-          <span style={{ color: '#43A047', filter: 'drop-shadow(1px 1px 1px rgba(0,0,0,0.3))' }} className="font-black">K</span>
-          <span style={{ color: '#1E88E5', filter: 'drop-shadow(1px 1px 1px rgba(0,0,0,0.3))' }} className="font-black">I</span>
+    corner = '★';
+    const sz = small ? 9 : large ? 22 : 15;
+    center = (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
+        <span style={{ ...font, fontSize: sz * 0.55, color: '#9B59B6', letterSpacing: 1 }}>SUPER</span>
+        <div style={{ display: 'flex', gap: 1 }}>
+          {'TAKI'.split('').map((l, i) => (
+            <span key={i} style={{ ...font, fontSize: sz, color: TAKI_COLORS[i], textShadow: '1px 1px 0 rgba(0,0,0,0.4)' }}>{l}</span>
+          ))}
         </div>
       </div>
     );
+  } else if (card.type === 'plus') {
+    corner = '+';
+    center = (
+      <span style={{ ...font, fontSize: cFs * 1.15, color: '#FFF', textShadow: extrude('rgba(0,0,0,0.35)', depth) }}>
+        +
+      </span>
+    );
+  } else if (card.type === 'stop') {
+    corner = '✋';
+    center = (
+      <span style={{ fontSize: small ? 20 : large ? 60 : 40, filter: 'drop-shadow(2px 2px 2px rgba(0,0,0,0.3))' }}>
+        🤚
+      </span>
+    );
+  } else if (card.type === 'change_direction') {
+    corner = '⇄';
+    center = (
+      <span style={{ ...font, fontSize: cFs * 0.9, color: '#FFF', textShadow: extrude('rgba(0,0,0,0.35)', depth) }}>
+        ⇄
+      </span>
+    );
   } else if (card.type === 'change_color') {
-    cornerLabel = '🎨';
-    centerContent = (
-      <div className={`grid grid-cols-2 ${small ? 'gap-0.5' : 'gap-1'}`}>
-        {['#E53935', '#1E88E5', '#43A047', '#F9A825'].map((c, i) => (
-          <div
-            key={i}
-            className={`${small ? 'w-2.5 h-2.5' : large ? 'w-7 h-7' : 'w-5 h-5'} rounded-sm shadow-sm`}
-            style={{ backgroundColor: c }}
-          />
+    corner = '★';
+    const sq = small ? 10 : large ? 26 : 18;
+    center = (
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: small ? 2 : large ? 5 : 3 }}>
+        {Object.values(PAL).map((c, i) => (
+          <div key={i} style={{ width: sq, height: sq, backgroundColor: c.m, borderRadius: 3, boxShadow: `1px 1px 0 ${c.d}` }} />
         ))}
       </div>
     );
   } else {
-    const { label, fontSize } = getActionSymbol(card.type);
-    cornerLabel = label;
-    centerContent = (
-      <span
-        className={`font-black leading-none ${small ? 'text-base' : fontSize}`}
-        style={{
-          color: hex,
-          textShadow: isWild ? '1px 1px 2px rgba(0,0,0,0.3)' : `1px 1px 0 ${darkHex}`,
-          fontFamily: "'Arial Black', 'Impact', sans-serif",
-        }}
-      >
-        {label}
-      </span>
-    );
+    corner = '?';
+    center = <span style={{ ...font, fontSize: cFs, color: txt }}>{card.type}</span>;
   }
-
-  // Wild card background
-  const bgStyle = isWild
-    ? { background: 'linear-gradient(135deg, #f3e5f5 0%, #e1bee7 50%, #ce93d8 100%)' }
-    : { backgroundColor: '#FFFFFF' };
-
-  const borderColor = isWild ? '#9C27B0' : hex;
 
   return (
     <div
       onClick={playable ? onClick : undefined}
-      className={`
-        ${sizeClass}
-        flex flex-col items-center justify-center
-        font-bold select-none relative overflow-hidden
-        transition-all duration-150
-        ${playable ? 'card-playable cursor-pointer' : ''}
-      `}
       style={{
-        ...bgStyle,
-        border: `${small ? '2px' : '3px'} solid ${borderColor}`,
+        width: w, height: h, borderRadius: r,
+        border: `${bw}px solid ${coloredBg ? p.d : isWild ? '#7B1FA2' : p.d}`,
+        backgroundColor: bg,
         boxShadow: playable
-          ? `0 0 12px ${hex}88, 0 4px 12px rgba(0,0,0,0.3)`
-          : '0 2px 8px rgba(0,0,0,0.2)',
+          ? `0 -6px 0 0 rgba(255,255,255,0.15), 0 4px 14px rgba(0,0,0,0.35), 0 0 16px ${p.m}55`
+          : '0 2px 6px rgba(0,0,0,0.18)',
+        cursor: playable ? 'pointer' : 'default',
+        position: 'relative',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        overflow: 'hidden',
+        transition: 'transform 0.15s, box-shadow 0.15s',
+        transform: playable ? 'translateY(-8px)' : 'none',
+        flexShrink: 0, userSelect: 'none' as const,
       }}
     >
-      {/* Top-left corner */}
       {!small && (
-        <span
-          className={`absolute ${large ? 'top-2 left-2.5' : 'top-1 left-1.5'} ${cornerSize} font-black`}
-          style={{ color: hex }}
-        >
-          {cornerLabel}
-        </span>
+        <span style={{ position: 'absolute', top: pad, left: pad + 1, fontSize: crFs, color: txt, ...font }}>{corner}</span>
       )}
-
-      {/* Center content */}
-      {centerContent}
-
-      {/* Bottom-right corner (rotated) */}
+      {center}
       {!small && (
-        <span
-          className={`absolute ${large ? 'bottom-2 right-2.5' : 'bottom-1 right-1.5'} ${cornerSize} font-black rotate-180`}
-          style={{ color: hex }}
-        >
-          {cornerLabel}
-        </span>
+        <span style={{ position: 'absolute', bottom: pad, right: pad + 1, fontSize: crFs, color: txt, ...font, transform: 'rotate(180deg)' }}>{corner}</span>
       )}
     </div>
   );
 }
 
-// Card back (face down)
+/* ── Card Back ───────────────────────────────────────────── */
 export function CardBack({ small = false, large = false }: { small?: boolean; large?: boolean }) {
-  const sizeClass = small
-    ? 'w-[52px] h-[74px] rounded-lg'
-    : large
-    ? 'w-[120px] h-[170px] sm:w-[140px] sm:h-[196px] rounded-2xl'
-    : 'w-[85px] h-[120px] sm:w-[100px] sm:h-[140px] rounded-xl';
+  const { w, h, r } = dims(small, large);
+  const stripe = small ? 5 : large ? 9 : 7;
 
   return (
-    <div
-      className={`${sizeClass} flex items-center justify-center relative overflow-hidden`}
-      style={{
-        background: 'linear-gradient(135deg, #1565C0 0%, #0D47A1 50%, #1A237E 100%)',
-        border: '3px solid #1565C0',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-      }}
-    >
-      {/* Inner border */}
-      <div
-        className="absolute inset-2 rounded-lg border-2 border-white/30"
-        style={{ borderStyle: 'dashed' }}
-      />
-      <div className="text-center flex items-center">
-        <span style={{ color: '#E53935', fontFamily: "'Arial Black', 'Impact', sans-serif" }}
-          className={`font-black ${small ? 'text-[8px]' : large ? 'text-2xl' : 'text-sm sm:text-base'}`}>T</span>
-        <span style={{ color: '#F9A825', fontFamily: "'Arial Black', 'Impact', sans-serif" }}
-          className={`font-black ${small ? 'text-[8px]' : large ? 'text-2xl' : 'text-sm sm:text-base'}`}>A</span>
-        <span style={{ color: '#43A047', fontFamily: "'Arial Black', 'Impact', sans-serif" }}
-          className={`font-black ${small ? 'text-[8px]' : large ? 'text-2xl' : 'text-sm sm:text-base'}`}>K</span>
-        <span style={{ color: '#1E88E5', fontFamily: "'Arial Black', 'Impact', sans-serif" }}
-          className={`font-black ${small ? 'text-[8px]' : large ? 'text-2xl' : 'text-sm sm:text-base'}`}>I</span>
+    <div style={{
+      width: w, height: h, borderRadius: r,
+      border: '2.5px solid #444',
+      overflow: 'hidden', position: 'relative',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+      flexShrink: 0,
+    }}>
+      {/* Crosshatch pattern */}
+      <div style={{
+        position: 'absolute',
+        inset: small ? 3 : 5,
+        borderRadius: r - 3,
+        background: `
+          repeating-linear-gradient(45deg, transparent, transparent ${stripe}px, #C0392B ${stripe}px, #C0392B ${stripe + 1.5}px),
+          repeating-linear-gradient(-45deg, transparent, transparent ${stripe}px, #C0392B ${stripe}px, #C0392B ${stripe + 1.5}px)
+        `,
+        backgroundColor: '#FFF8F0',
+      }} />
+      {/* Center label */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <div style={{
+          backgroundColor: 'rgba(255,255,255,0.92)',
+          padding: small ? '1px 3px' : large ? '6px 12px' : '3px 7px',
+          borderRadius: 4,
+          boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
+          display: 'flex', gap: 0,
+        }}>
+          {'TAKI'.split('').map((l, i) => (
+            <span key={i} style={{
+              fontWeight: 900,
+              fontFamily: "'Arial Black', 'Impact', sans-serif",
+              fontSize: small ? 7 : large ? 18 : 11,
+              color: TAKI_COLORS[i],
+            }}>{l}</span>
+          ))}
+        </div>
       </div>
     </div>
   );
