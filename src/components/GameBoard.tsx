@@ -236,8 +236,11 @@ export default function GameBoard({
 
       {/* My hand */}
       <div className={`px-2 pb-4 pt-2 bg-black/30 border-t border-white/10 ${isMyTurn ? 'ring-2 ring-green-500/50 ring-inset' : ''}`}>
-        <div className="flex items-center gap-1 justify-center overflow-x-auto pb-1" style={{ scrollbarWidth: 'thin' }}>
-          <div className="flex gap-1 sm:gap-1.5 px-2" style={{ flexWrap: 'nowrap' }}>
+        <div
+          className="overflow-x-auto pb-2 -mx-2 px-2"
+          style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'thin' }}
+        >
+          <div className="flex gap-1.5 sm:gap-2 w-max mx-auto">
             {myPlayer?.cards.map(card => {
               const playable = isMyTurn && canPlayCard(gameState, card, playerId);
               return (

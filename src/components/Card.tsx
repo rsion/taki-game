@@ -82,7 +82,6 @@ export default function Card({ card, playable = false, small = false, large = fa
           color: hex,
           textShadow: `2px 2px 0 ${darkHex}, -1px -1px 0 ${lightHex}, 3px 3px 6px rgba(0,0,0,0.15)`,
           fontFamily: "'Arial Black', 'Impact', sans-serif",
-          WebkitTextStroke: small ? '0px' : '1px ' + darkHex,
         }}
       >
         {numStr}
@@ -119,30 +118,14 @@ export default function Card({ card, playable = false, small = false, large = fa
     cornerLabel = '★';
     centerContent = (
       <div className="flex flex-col items-center">
-        <span
-          className={`font-black tracking-tight leading-none ${small ? 'text-[8px]' : 'text-lg sm:text-xl'}`}
-          style={{
-            background: 'linear-gradient(135deg, #E53935, #F9A825, #43A047, #1E88E5)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            fontFamily: "'Arial Black', 'Impact', sans-serif",
-            filter: 'drop-shadow(1px 1px 1px rgba(0,0,0,0.3))',
-          }}
-        >
-          TA
-        </span>
-        <span
-          className={`font-black tracking-tight leading-none ${small ? 'text-[8px]' : 'text-lg sm:text-xl'}`}
-          style={{
-            background: 'linear-gradient(135deg, #1E88E5, #43A047, #F9A825, #E53935)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            fontFamily: "'Arial Black', 'Impact', sans-serif",
-            filter: 'drop-shadow(1px 1px 1px rgba(0,0,0,0.3))',
-          }}
-        >
-          KI
-        </span>
+        <div className={`flex ${small ? 'text-[8px]' : 'text-lg sm:text-xl'}`} style={{ fontFamily: "'Arial Black', 'Impact', sans-serif" }}>
+          <span style={{ color: '#E53935', filter: 'drop-shadow(1px 1px 1px rgba(0,0,0,0.3))' }} className="font-black">T</span>
+          <span style={{ color: '#F9A825', filter: 'drop-shadow(1px 1px 1px rgba(0,0,0,0.3))' }} className="font-black">A</span>
+        </div>
+        <div className={`flex ${small ? 'text-[8px]' : 'text-lg sm:text-xl'}`} style={{ fontFamily: "'Arial Black', 'Impact', sans-serif" }}>
+          <span style={{ color: '#43A047', filter: 'drop-shadow(1px 1px 1px rgba(0,0,0,0.3))' }} className="font-black">K</span>
+          <span style={{ color: '#1E88E5', filter: 'drop-shadow(1px 1px 1px rgba(0,0,0,0.3))' }} className="font-black">I</span>
+        </div>
       </div>
     );
   } else if (card.type === 'change_color') {
@@ -191,7 +174,6 @@ export default function Card({ card, playable = false, small = false, large = fa
         font-bold select-none relative overflow-hidden
         transition-all duration-150
         ${playable ? 'card-playable cursor-pointer' : ''}
-        ${!playable && !small ? 'opacity-75' : ''}
       `}
       style={{
         ...bgStyle,
@@ -249,19 +231,15 @@ export function CardBack({ small = false, large = false }: { small?: boolean; la
         className="absolute inset-2 rounded-lg border-2 border-white/30"
         style={{ borderStyle: 'dashed' }}
       />
-      <div className="text-center flex flex-col items-center">
-        <span
-          className={`font-black tracking-tight leading-none ${small ? 'text-[8px]' : large ? 'text-2xl' : 'text-sm sm:text-base'}`}
-          style={{
-            background: 'linear-gradient(135deg, #E53935, #F9A825, #43A047, #1E88E5)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            fontFamily: "'Arial Black', 'Impact', sans-serif",
-            filter: 'drop-shadow(1px 1px 2px rgba(0,0,0,0.5))',
-          }}
-        >
-          TAKI
-        </span>
+      <div className="text-center flex items-center">
+        <span style={{ color: '#E53935', fontFamily: "'Arial Black', 'Impact', sans-serif" }}
+          className={`font-black ${small ? 'text-[8px]' : large ? 'text-2xl' : 'text-sm sm:text-base'}`}>T</span>
+        <span style={{ color: '#F9A825', fontFamily: "'Arial Black', 'Impact', sans-serif" }}
+          className={`font-black ${small ? 'text-[8px]' : large ? 'text-2xl' : 'text-sm sm:text-base'}`}>A</span>
+        <span style={{ color: '#43A047', fontFamily: "'Arial Black', 'Impact', sans-serif" }}
+          className={`font-black ${small ? 'text-[8px]' : large ? 'text-2xl' : 'text-sm sm:text-base'}`}>K</span>
+        <span style={{ color: '#1E88E5', fontFamily: "'Arial Black', 'Impact', sans-serif" }}
+          className={`font-black ${small ? 'text-[8px]' : large ? 'text-2xl' : 'text-sm sm:text-base'}`}>I</span>
       </div>
     </div>
   );
