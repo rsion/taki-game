@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { createBrowserClient } from '@/lib/supabase';
 import { GameState, CardColor } from '@/lib/types';
 import * as logic from '@/lib/game-logic';
+import { BOT_ID, botPlay } from '@/lib/bot';
 import GameBoard from '@/components/GameBoard';
 
 export default function GamePage({ params }: { params: { code: string } }) {
@@ -15,17 +16,19 @@ export default function GamePage({ params }: { params: { code: string } }) {
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [pendingCardId, setPendingCardId] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
+  const [isBotMode, setIsBotMode] = useState(false);
   const [error, setError] = useState('');
 
   const channelRef = useRef<ReturnType<ReturnType<typeof createBrowserClient>['channel']> | null>(null);
   const stateRef = useRef<GameState | null>(null);
+  const isBotRef = useRef(false);
 
   // Keep ref in sync with state
   useEffect(() => {
     stateRef.current = gameState;
   }, [gameState]);
 
-  // Initialize & subscribe to broadcast
+  // ── Initialize & subscribe ────────────────────────────────
   useEffect(() => {
     const stored = sessionStorage.getItem(`player_${code}`);
     if (!stored) {
@@ -37,21 +40,34 @@ export default function GamePage({ params }: { params: { code: string } }) {
     setPlayerId(id);
     setIsHost(hostFlag || false);
 
-    // If host, create initial state
+    // Check bot mode
+    const botGame = sessionStorage.getItem(`bot_${code}`) === 'true';
+    setIsBotMode(botGame);
+    isBotRef.current = botGame;
+
+    if (botGame) {
+      // Load pre-created game state from sessionStorage
+      const saved = sessionStorage.getItem(`gameState_${code}`);
+      if (saved) {
+        try { setGameState(JSON.parse(saved)); } catch {}
+      }
+      setConnected(true);
+      return; // no Supabase needed
+    }
+
+    // ── Multiplayer: Supabase Broadcast ──
     if (hostFlag) {
       let state = logic.createInitialGameState(code, id);
       state = logic.addPlayer(state, id, name);
       setGameState(state);
       saveState(code, state);
     } else {
-      // Try recovering from sessionStorage
       const saved = sessionStorage.getItem(`gameState_${code}`);
       if (saved) {
         try { setGameState(JSON.parse(saved)); } catch {}
       }
     }
 
-    // Subscribe to Supabase Broadcast
     const supabase = createBrowserClient();
     const channel = supabase.channel(`game:${code}`, {
       config: { broadcast: { self: true } },
@@ -65,7 +81,6 @@ export default function GamePage({ params }: { params: { code: string } }) {
         }
       })
       .on('broadcast', { event: 'join_request' }, ({ payload }: any) => {
-        // Only host handles join requests
         const s = sessionStorage.getItem(`player_${code}`);
         if (!s) return;
         const info = JSON.parse(s);
@@ -74,7 +89,6 @@ export default function GamePage({ params }: { params: { code: string } }) {
         const current = stateRef.current;
         if (!current || current.status !== 'waiting') return;
         if (current.players.find((p: any) => p.id === payload.playerId)) {
-          // Already joined, just broadcast current state
           channel.send({ type: 'broadcast', event: 'state_update', payload: { state: current } });
           return;
         }
@@ -104,7 +118,6 @@ export default function GamePage({ params }: { params: { code: string } }) {
           setConnected(true);
 
           if (hostFlag) {
-            // Broadcast initial state after a short delay
             setTimeout(() => {
               const current = stateRef.current;
               if (current) {
@@ -112,13 +125,11 @@ export default function GamePage({ params }: { params: { code: string } }) {
               }
             }, 500);
           } else {
-            // Send join request
             channel.send({
               type: 'broadcast',
               event: 'join_request',
               payload: { playerId: id, playerName: name },
             });
-            // Request current state
             setTimeout(() => {
               channel.send({ type: 'broadcast', event: 'request_state', payload: {} });
             }, 300);
@@ -134,16 +145,41 @@ export default function GamePage({ params }: { params: { code: string } }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code]);
 
+  // ── Bot turn auto-play ────────────────────────────────────
+  useEffect(() => {
+    if (!isBotMode || !gameState || gameState.status !== 'playing') return;
+    const current = gameState.players[gameState.currentPlayerIndex];
+    if (!current || current.id !== BOT_ID) return;
+
+    const delay = gameState.takiMode.active && gameState.takiMode.playerId === BOT_ID ? 500 : 900;
+
+    const timer = setTimeout(() => {
+      try {
+        const newState = botPlay(gameState);
+        setGameState(newState);
+        saveState(code, newState);
+      } catch (err) {
+        console.error('Bot error:', err);
+      }
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [gameState, isBotMode, code]);
+
+  // ── Broadcast helper ──────────────────────────────────────
   const broadcast = useCallback((state: GameState) => {
     setGameState(state);
     saveState(code, state);
-    channelRef.current?.send({
-      type: 'broadcast',
-      event: 'state_update',
-      payload: { state },
-    });
+    if (!isBotRef.current && channelRef.current) {
+      channelRef.current.send({
+        type: 'broadcast',
+        event: 'state_update',
+        payload: { state },
+      });
+    }
   }, [code]);
 
+  // ── Player actions ────────────────────────────────────────
   const handleStartGame = useCallback(() => {
     if (!gameState) return;
     try {
@@ -161,7 +197,6 @@ export default function GamePage({ params }: { params: { code: string } }) {
     const card = player.cards.find(c => c.id === cardId);
     if (!card) return;
 
-    // Color picker needed for wilds
     if (card.type === 'change_color' || card.type === 'super_taki') {
       setPendingCardId(cardId);
       setShowColorPicker(true);
@@ -208,7 +243,7 @@ export default function GamePage({ params }: { params: { code: string } }) {
     }
   }, [gameState, playerId, broadcast]);
 
-  // Loading state
+  // ── Loading ───────────────────────────────────────────────
   if (!gameState || !playerId) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">

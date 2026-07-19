@@ -2,9 +2,17 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { createInitialGameState, addPlayer, startGame } from '@/lib/game-logic';
+import { BOT_ID, BOT_NAME } from '@/lib/bot';
+
+function generateLocalCode(): string {
+  let code = '';
+  for (let i = 0; i < 6; i++) code += String(Math.floor(Math.random() * 10));
+  return code;
+}
 
 export default function Home() {
-  const [mode, setMode] = useState<'menu' | 'create' | 'join'>('menu');
+  const [mode, setMode] = useState<'menu' | 'create' | 'join' | 'bot'>('menu');
   const [name, setName] = useState('');
   const [roomCode, setRoomCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -23,7 +31,6 @@ export default function Home() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to create game');
-      // Store player info in sessionStorage
       sessionStorage.setItem(`player_${data.code}`, JSON.stringify({
         id: data.playerId,
         name: name.trim(),
@@ -43,7 +50,7 @@ export default function Home() {
     setLoading(true);
     setError('');
     try {
-      const code = roomCode.trim().toUpperCase();
+      const code = roomCode.trim();
       const res = await fetch('/api/game/join', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -62,6 +69,29 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleBot() {
+    if (!name.trim()) { setError('Enter your name'); return; }
+
+    const code = generateLocalCode();
+    const playerId = crypto.randomUUID();
+
+    // Create game, add both players, start immediately
+    let state = createInitialGameState(code, playerId);
+    state = addPlayer(state, playerId, name.trim());
+    state = addPlayer(state, BOT_ID, BOT_NAME);
+    state = startGame(state);
+
+    sessionStorage.setItem(`player_${code}`, JSON.stringify({
+      id: playerId,
+      name: name.trim(),
+      isHost: true,
+    }));
+    sessionStorage.setItem(`bot_${code}`, 'true');
+    sessionStorage.setItem(`gameState_${code}`, JSON.stringify(state));
+
+    router.push(`/game/${code}`);
   }
 
   return (
@@ -93,10 +123,16 @@ export default function Home() {
             >
               🚪 Join Game
             </button>
+            <button
+              onClick={() => setMode('bot')}
+              className="w-full py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold text-lg rounded-xl hover:from-purple-600 hover:to-pink-600 transition-all shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-95"
+            >
+              🤖 שחק נגד המחשב
+            </button>
           </div>
         )}
 
-        {(mode === 'create' || mode === 'join') && (
+        {(mode === 'create' || mode === 'join' || mode === 'bot') && (
           <div className="space-y-4">
             <div>
               <label className="block text-white/70 text-sm mb-1">Your Name</label>
@@ -132,11 +168,17 @@ export default function Home() {
             )}
 
             <button
-              onClick={mode === 'create' ? handleCreate : handleJoin}
+              onClick={mode === 'create' ? handleCreate : mode === 'join' ? handleJoin : handleBot}
               disabled={loading}
               className="w-full py-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold text-lg rounded-xl hover:from-green-600 hover:to-emerald-600 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? '⏳ Loading...' : mode === 'create' ? 'Create Room' : 'Join Room'}
+              {loading
+                ? '⏳ Loading...'
+                : mode === 'create'
+                ? 'Create Room'
+                : mode === 'join'
+                ? 'Join Room'
+                : '🤖 התחל משחק'}
             </button>
 
             <button
