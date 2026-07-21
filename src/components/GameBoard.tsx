@@ -222,7 +222,7 @@ export default function GameBoard({
 
   // PLAYING
   return (
-    <div className="min-h-screen game-table flex flex-col relative overflow-hidden">
+    <div className="h-dvh game-table flex flex-col relative overflow-hidden" style={{ height: '100dvh' }}>
       {/* Color picker overlay */}
       {showColorPicker && (
         <ColorPicker onChoose={onChooseColor} onCancel={onCancelColorPicker} />
@@ -248,7 +248,7 @@ export default function GameBoard({
       </div>
 
       {/* Other players */}
-      <div className="flex justify-center gap-4 px-4 py-3 flex-wrap">
+      <div className="flex justify-center gap-3 px-3 py-1.5 flex-wrap">
         {otherPlayers.map(p => {
           const isCurrentTurn = gameState.players[gameState.currentPlayerIndex]?.id === p.id;
           return (
@@ -270,7 +270,7 @@ export default function GameBoard({
       </div>
 
       {/* Center - discard & draw piles */}
-      <div className="flex-1 flex items-center justify-center gap-6 px-4">
+      <div className="flex-1 min-h-0 flex items-center justify-center gap-6 px-4">
         {/* Draw pile */}
         <div className="flex flex-col items-center gap-2">
           <button
@@ -282,9 +282,9 @@ export default function GameBoard({
                 : 'opacity-70'
             }`}
           >
-            <CardBack large />
+            <CardBack />
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="bg-black/50 text-white text-xs font-bold px-2 py-1 rounded">
+              <span className="bg-black/50 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
                 {gameState.deck.length}
               </span>
             </div>
@@ -298,7 +298,7 @@ export default function GameBoard({
 
         {/* Discard pile */}
         <div className="flex flex-col items-center gap-2">
-          {topCard && <Card card={topCard} large />}
+          {topCard && <Card card={topCard} />}
           {/* Active color indicator */}
           {gameState.activeColor && (
             <div className={`px-3 py-1 rounded-full border text-xs font-bold text-white ${COLOR_BG[gameState.activeColor] || ''}`}>
@@ -329,7 +329,7 @@ export default function GameBoard({
 
       {/* My hand — green shelf */}
       <div
-        className={`px-2 pb-4 pt-3 border-t border-white/10 ${isMyTurn ? 'ring-2 ring-green-400/60 ring-inset' : ''}`}
+        className={`px-2 pb-3 pt-2 border-t border-white/10 ${isMyTurn ? 'ring-2 ring-green-400/60 ring-inset' : ''}`}
         style={{
           background: 'linear-gradient(180deg, #4CAF50 0%, #2E7D32 40%, #1B5E20 100%)',
           borderTopLeftRadius: 24,
