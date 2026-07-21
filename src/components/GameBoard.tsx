@@ -1,6 +1,7 @@
 'use client';
 
-import { GameState, CardColor } from '@/lib/types';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { GameState, CardColor, Card as CardType } from '@/lib/types';
 import { canPlayCard } from '@/lib/game-logic';
 import Card, { CardBack, cardPoints } from './Card';
 import ColorPicker from './ColorPicker';
@@ -44,6 +45,96 @@ export default function GameBoard({
   const topCard = gameState.discardPile[gameState.discardPile.length - 1];
   const inMyTaki = gameState.takiMode.active && gameState.takiMode.playerId === playerId;
 
+  /* ═══ Card reorder state ═══════════════════════════════════ */
+  const [cardOrder, setCardOrder] = useState<string[]>([]);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dragOffsetX, setDragOffsetX] = useState(0);
+  const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
+  const cardWidthRef = useRef(92); // card width + gap
+
+  // Sync card order whenever the hand changes
+  useEffect(() => {
+    if (!myPlayer) return;
+    const ids = myPlayer.cards.map(c => c.id);
+    setCardOrder(prev => {
+      const kept = prev.filter(id => ids.includes(id));
+      const added = ids.filter(id => !prev.includes(id));
+      return [...kept, ...added];
+    });
+  }, [myPlayer?.cards.length, myPlayer?.cards.map(c => c.id).join(',')]);
+
+  // Build display-ordered cards
+  const orderedCards = useMemo(() => {
+    if (!myPlayer) return [];
+    return cardOrder
+      .map(id => myPlayer.cards.find(c => c.id === id))
+      .filter((c): c is CardType => !!c);
+  }, [cardOrder, myPlayer]);
+
+  /* ─── Touch handlers for drag-to-reorder ───────────────── */
+  const handleCardTouchStart = useCallback((idx: number, e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    dragStartRef.current = { x: touch.clientX, y: touch.clientY };
+
+    longPressRef.current = setTimeout(() => {
+      setDragIdx(idx);
+      setDragOffsetX(0);
+      if (navigator.vibrate) navigator.vibrate(25);
+    }, 350);
+  }, []);
+
+  const handleContainerTouchMove = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0];
+
+    if (dragIdx === null) {
+      // Not dragging yet — cancel long press if scrolling
+      if (longPressRef.current && dragStartRef.current) {
+        const dx = Math.abs(touch.clientX - dragStartRef.current.x);
+        const dy = Math.abs(touch.clientY - dragStartRef.current.y);
+        if (dx > 8 || dy > 8) {
+          clearTimeout(longPressRef.current);
+          longPressRef.current = null;
+        }
+      }
+      return;
+    }
+
+    // Dragging — prevent scroll
+    e.preventDefault();
+    const dx = touch.clientX - dragStartRef.current!.x;
+    setDragOffsetX(dx);
+
+    // Swap when dragged far enough
+    const threshold = cardWidthRef.current * 0.55;
+    if (Math.abs(dx) > threshold) {
+      const dir = dx > 0 ? 1 : -1;
+      const newIdx = dragIdx + dir;
+      setCardOrder(prev => {
+        if (newIdx < 0 || newIdx >= prev.length) return prev;
+        const next = [...prev];
+        [next[dragIdx], next[newIdx]] = [next[newIdx], next[dragIdx]];
+        return next;
+      });
+      if (newIdx >= 0 && newIdx < cardOrder.length) {
+        setDragIdx(newIdx);
+        dragStartRef.current = { x: touch.clientX, y: dragStartRef.current!.y };
+        setDragOffsetX(0);
+        if (navigator.vibrate) navigator.vibrate(15);
+      }
+    }
+  }, [dragIdx, cardOrder.length]);
+
+  const handleContainerTouchEnd = useCallback(() => {
+    if (longPressRef.current) {
+      clearTimeout(longPressRef.current);
+      longPressRef.current = null;
+    }
+    setDragIdx(null);
+    setDragOffsetX(0);
+    dragStartRef.current = null;
+  }, []);
+
   // WAITING / LOBBY
   if (gameState.status === 'waiting') {
     return (
@@ -62,7 +153,7 @@ export default function GameBoard({
             <p className="text-white/70 text-sm font-semibold">
               Players ({gameState.players.length}/4)
             </p>
-            {gameState.players.map((p, i) => (
+            {gameState.players.map((p) => (
               <div
                 key={p.id}
                 className="flex items-center justify-between bg-white/10 rounded-lg px-4 py-2"
@@ -99,12 +190,10 @@ export default function GameBoard({
     );
   }
 
-  // FINISHED — match official Taki "סיכום משחק" design
+  // FINISHED
   if (gameState.status === 'finished') {
-    // Calculate scores: winner gets sum of all opponents' remaining card point values
     const scores = gameState.players.map(p => {
       if (p.id === gameState.winnerId) {
-        // Winner gets points from all other players' remaining cards
         return gameState.players
           .filter(op => op.id !== p.id)
           .reduce((sum, op) => sum + op.cards.reduce((cs, c) => cs + cardPoints(c), 0), 0);
@@ -112,7 +201,6 @@ export default function GameBoard({
       return 0;
     });
 
-    // Sort by score descending
     const ranked = gameState.players
       .map((p, i) => ({ ...p, score: scores[i] }))
       .sort((a, b) => b.score - a.score);
@@ -129,11 +217,8 @@ export default function GameBoard({
           boxShadow: '0 0 30px rgba(52,152,219,0.3), 0 8px 32px rgba(0,0,0,0.4)',
         }}>
           <h2 style={{
-            color: '#FFFFFF',
-            fontSize: 28,
-            fontWeight: 800,
-            textAlign: 'center',
-            marginBottom: 24,
+            color: '#FFFFFF', fontSize: 28, fontWeight: 800,
+            textAlign: 'center', marginBottom: 24,
             fontFamily: "'Arial Black', sans-serif",
             textShadow: '0 2px 4px rgba(0,0,0,0.3)',
           }}>
@@ -142,17 +227,12 @@ export default function GameBoard({
 
           <div style={{ marginBottom: 24 }}>
             {ranked.map((p, i) => (
-              <div
-                key={p.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px 16px',
-                  backgroundColor: i % 2 === 0 ? 'rgba(255,255,255,0.12)' : 'transparent',
-                  borderRadius: 8,
-                }}
-              >
+              <div key={p.id} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '12px 16px',
+                backgroundColor: i % 2 === 0 ? 'rgba(255,255,255,0.12)' : 'transparent',
+                borderRadius: 8,
+              }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 16, fontWeight: 700, minWidth: 20 }}>
                     {i + 1}
@@ -162,12 +242,8 @@ export default function GameBoard({
                   </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                  <span style={{ color: '#FFFFFF', fontSize: 22, fontWeight: 800 }}>
-                    {p.score}
-                  </span>
-                  <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 14 }}>
-                    נק&apos;
-                  </span>
+                  <span style={{ color: '#FFFFFF', fontSize: 22, fontWeight: 800 }}>{p.score}</span>
+                  <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 14 }}>נק&apos;</span>
                 </div>
               </div>
             ))}
@@ -175,19 +251,12 @@ export default function GameBoard({
 
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
             <button
-              onClick={() => {
-                sessionStorage.clear();
-                window.location.href = '/';
-              }}
+              onClick={() => { sessionStorage.clear(); window.location.href = '/'; }}
               style={{
                 background: 'linear-gradient(180deg, #5FD35F 0%, #3CB43C 100%)',
-                color: '#FFFFFF',
-                fontWeight: 800,
-                fontSize: 18,
-                padding: '14px 32px',
-                borderRadius: 30,
-                border: '2px solid #2E8B2E',
-                cursor: 'pointer',
+                color: '#FFFFFF', fontWeight: 800, fontSize: 18,
+                padding: '14px 32px', borderRadius: 30,
+                border: '2px solid #2E8B2E', cursor: 'pointer',
                 boxShadow: '0 3px 8px rgba(0,0,0,0.3)',
                 fontFamily: "'Arial Black', sans-serif",
               }}
@@ -195,19 +264,12 @@ export default function GameBoard({
               שחק שוב
             </button>
             <button
-              onClick={() => {
-                sessionStorage.clear();
-                window.location.href = '/';
-              }}
+              onClick={() => { sessionStorage.clear(); window.location.href = '/'; }}
               style={{
                 background: 'linear-gradient(180deg, #E74C3C 0%, #C0392B 100%)',
-                color: '#FFFFFF',
-                fontWeight: 800,
-                fontSize: 18,
-                padding: '14px 32px',
-                borderRadius: 30,
-                border: '2px solid #A93226',
-                cursor: 'pointer',
+                color: '#FFFFFF', fontWeight: 800, fontSize: 18,
+                padding: '14px 32px', borderRadius: 30,
+                border: '2px solid #A93226', cursor: 'pointer',
                 boxShadow: '0 3px 8px rgba(0,0,0,0.3)',
                 fontFamily: "'Arial Black', sans-serif",
               }}
@@ -299,7 +361,6 @@ export default function GameBoard({
         {/* Discard pile */}
         <div className="flex flex-col items-center gap-2">
           {topCard && <Card card={topCard} />}
-          {/* Active color indicator */}
           {gameState.activeColor && (
             <div className={`px-3 py-1 rounded-full border text-xs font-bold text-white ${COLOR_BG[gameState.activeColor] || ''}`}>
               {gameState.activeColor.toUpperCase()}
@@ -327,7 +388,7 @@ export default function GameBoard({
         </div>
       )}
 
-      {/* My hand — green shelf */}
+      {/* ═══ My hand — green shelf with drag-to-reorder ═══ */}
       <div
         className={`px-2 pb-3 pt-2 border-t border-white/10 ${isMyTurn ? 'ring-2 ring-green-400/60 ring-inset' : ''}`}
         style={{
@@ -338,17 +399,37 @@ export default function GameBoard({
       >
         <div
           className="overflow-x-auto pb-2 -mx-2 px-2"
-          style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'thin' }}
+          style={{
+            WebkitOverflowScrolling: dragIdx !== null ? undefined : 'touch',
+            scrollbarWidth: 'thin',
+            touchAction: dragIdx !== null ? 'none' : 'pan-x',
+          }}
+          onTouchMove={handleContainerTouchMove}
+          onTouchEnd={handleContainerTouchEnd}
+          onTouchCancel={handleContainerTouchEnd}
         >
           <div className="flex gap-1.5 sm:gap-2 w-max mx-auto">
-            {myPlayer?.cards.map(card => {
+            {orderedCards.map((card, idx) => {
               const playable = isMyTurn && canPlayCard(gameState, card, playerId);
+              const isDragging = dragIdx === idx;
               return (
-                <div key={card.id} className="flex-shrink-0 card-enter">
+                <div
+                  key={card.id}
+                  className={`flex-shrink-0 ${isDragging ? '' : 'card-enter'}`}
+                  style={{
+                    transform: isDragging
+                      ? `translateX(${dragOffsetX}px) scale(1.12)`
+                      : undefined,
+                    zIndex: isDragging ? 50 : 1,
+                    opacity: isDragging ? 0.85 : 1,
+                    transition: isDragging ? 'none' : 'transform 0.15s ease',
+                  }}
+                  onTouchStart={(e) => handleCardTouchStart(idx, e)}
+                >
                   <Card
                     card={card}
-                    playable={playable}
-                    onClick={() => playable && onPlayCard(card.id)}
+                    playable={dragIdx === null && playable}
+                    onClick={() => dragIdx === null && playable && onPlayCard(card.id)}
                   />
                 </div>
               );
@@ -358,6 +439,7 @@ export default function GameBoard({
         <div className="text-center mt-1">
           <span className="text-white/40 text-xs">
             {myPlayer?.name} • {myPlayer?.cards.length} cards
+            {dragIdx !== null && ' • hold & drag to reorder'}
           </span>
         </div>
       </div>
