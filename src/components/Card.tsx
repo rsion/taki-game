@@ -88,7 +88,11 @@ export default function Card({ card, playable = false, small = false, large = fa
   /* ── Image-based card ──────────────────────────────────── */
   if (imgPath) {
     return (
-      <div onClick={playable ? onClick : undefined} style={containerStyle}>
+      <div onClick={playable ? onClick : undefined} style={{
+        ...containerStyle,
+        border: 'none',
+        backgroundColor: 'transparent',
+      }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={imgPath}
@@ -97,8 +101,8 @@ export default function Card({ card, playable = false, small = false, large = fa
           style={{
             width: '100%',
             height: '100%',
-            objectFit: 'contain',
-            borderRadius: Math.max(r - bw, 0),
+            objectFit: 'cover',
+            borderRadius: r,
             pointerEvents: 'none',
           }}
         />
@@ -165,11 +169,10 @@ export function CardBack({ small = false, large = false }: { small?: boolean; la
       width: w,
       height: h,
       borderRadius: r,
-      border: `${small ? 1.5 : 2}px solid #8B1621`,
       overflow: 'hidden',
       position: 'relative',
       boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
-      backgroundColor: '#FFFFFF',
+      backgroundColor: 'transparent',
       flexShrink: 0,
     }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -181,7 +184,7 @@ export function CardBack({ small = false, large = false }: { small?: boolean; la
           width: '100%',
           height: '100%',
           objectFit: 'cover',
-          borderRadius: Math.max(r - 2, 2),
+          borderRadius: r,
           pointerEvents: 'none',
         }}
       />
