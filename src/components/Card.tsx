@@ -25,9 +25,10 @@ export function cardPoints(card: CardType): number {
 
 /* ── Sizes ───────────────────────────────────────────────── */
 function dims(small: boolean, large: boolean) {
-  if (small) return { w: 50, h: 70, r: 5, bw: 1.5, fs: 30, cfs: 8, depth: 1, pad: 2 };
-  if (large) return { w: 130, h: 182, r: 10, bw: 2, fs: 76, cfs: 15, depth: 4, pad: 6 };
-  return { w: 90, h: 126, r: 8, bw: 1.5, fs: 52, cfs: 11, depth: 3, pad: 4 };
+  // Card PNGs are 256×512 (1:2 ratio) — containers must match
+  if (small) return { w: 45, h: 90, r: 5, bw: 1.5, fs: 26, cfs: 7, depth: 1, pad: 2 };
+  if (large) return { w: 100, h: 200, r: 10, bw: 2, fs: 60, cfs: 13, depth: 4, pad: 6 };
+  return { w: 80, h: 160, r: 8, bw: 1.5, fs: 44, cfs: 10, depth: 3, pad: 4 };
 }
 
 /* ── Image path mapper ───────────────────────────────────── */
