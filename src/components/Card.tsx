@@ -34,7 +34,6 @@ function dims(small: boolean, large: boolean) {
 /* ── Image path mapper ───────────────────────────────────── */
 function getCardImagePath(card: CardType): string | null {
   if (card.type === 'number') {
-    if (card.value === 2) return null; // no real asset for number 2
     return `/cards/${card.color}_${card.value}.png`;
   }
   if (card.type === 'change_color') return '/cards/change_color.png';
