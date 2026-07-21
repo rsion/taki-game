@@ -5,6 +5,8 @@ import { GameState, CardColor, Card as CardType } from '@/lib/types';
 import { canPlayCard } from '@/lib/game-logic';
 import Card, { CardBack, cardPoints } from './Card';
 import ColorPicker from './ColorPicker';
+import Confetti from './Confetti';
+import { soundManager } from '@/lib/sounds';
 
 const COLOR_BG: Record<string, string> = {
   red: 'bg-red-600/30 border-red-500',
@@ -44,6 +46,96 @@ export default function GameBoard({
   const currentPlayer = gameState.players[gameState.currentPlayerIndex];
   const topCard = gameState.discardPile[gameState.discardPile.length - 1];
   const inMyTaki = gameState.takiMode.active && gameState.takiMode.playerId === playerId;
+
+  /* ═══ Sound state ═══════════════════════════════════════════ */
+  const [soundOn, setSoundOn] = useState(true);
+  const prevDiscardLen = useRef(gameState.discardPile.length);
+  const prevStatus = useRef(gameState.status);
+  const prevMyCardCount = useRef(myPlayer?.cards.length ?? 0);
+  const soundInitRef = useRef(false);
+
+  // Initialize sounds on first interaction
+  useEffect(() => {
+    if (soundInitRef.current) return;
+    const initOnInteraction = () => {
+      soundManager.init();
+      soundInitRef.current = true;
+      document.removeEventListener('click', initOnInteraction);
+      document.removeEventListener('touchstart', initOnInteraction);
+    };
+    document.addEventListener('click', initOnInteraction);
+    document.addEventListener('touchstart', initOnInteraction);
+    return () => {
+      document.removeEventListener('click', initOnInteraction);
+      document.removeEventListener('touchstart', initOnInteraction);
+    };
+  }, []);
+
+  // Sound effects based on game state changes
+  useEffect(() => {
+    // Game started — deal sound
+    if (prevStatus.current === 'waiting' && gameState.status === 'playing') {
+      soundManager.play('deal');
+    }
+
+    // Game ended — win or lose
+    if (prevStatus.current !== 'finished' && gameState.status === 'finished') {
+      if (gameState.winnerId === playerId) {
+        soundManager.play('win');
+      } else {
+        soundManager.play('lose');
+      }
+    }
+
+    // Card played (discard pile grew)
+    if (gameState.status === 'playing' && gameState.discardPile.length > prevDiscardLen.current) {
+      const latestCard = gameState.discardPile[gameState.discardPile.length - 1];
+      if (latestCard) {
+        if (latestCard.type === 'draw_two') {
+          soundManager.play('plus_two');
+        } else if (latestCard.type === 'stop') {
+          soundManager.play('stop');
+        } else if (latestCard.type === 'change_direction') {
+          soundManager.play('direction');
+        } else if (latestCard.type === 'change_color' || latestCard.type === 'super_taki') {
+          soundManager.play('color_change');
+        } else {
+          soundManager.play('play_card');
+        }
+      }
+    }
+
+    // Last card warning
+    if (gameState.status === 'playing') {
+      for (const p of gameState.players) {
+        if (p.cards.length === 1) {
+          // Only fire once per state change
+          if (gameState.discardPile.length > prevDiscardLen.current) {
+            soundManager.play('last_card');
+          }
+          break;
+        }
+      }
+    }
+
+    prevDiscardLen.current = gameState.discardPile.length;
+    prevStatus.current = gameState.status;
+    prevMyCardCount.current = myPlayer?.cards.length ?? 0;
+  }, [gameState, playerId, myPlayer?.cards.length]);
+
+  const handleSoundToggle = useCallback(() => {
+    const nowOn = soundManager.toggle();
+    setSoundOn(nowOn);
+  }, []);
+
+  const handleDrawCard = useCallback(() => {
+    if (gameState.pendingDrawCount > 0) {
+      soundManager.play('draw_after_plus2');
+    } else {
+      soundManager.play('draw_card');
+    }
+    onDrawCard();
+  }, [onDrawCard, gameState.pendingDrawCount]);
 
   /* ═══ Card reorder state ═══════════════════════════════════ */
   const [cardOrder, setCardOrder] = useState<string[]>([]);
@@ -192,6 +284,7 @@ export default function GameBoard({
 
   // FINISHED
   if (gameState.status === 'finished') {
+    const iWon = gameState.winnerId === playerId;
     const scores = gameState.players.map(p => {
       if (p.id === gameState.winnerId) {
         return gameState.players
@@ -207,6 +300,7 @@ export default function GameBoard({
 
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
+        <Confetti active={iWon} />
         <div style={{
           background: 'linear-gradient(180deg, #1A6FA0 0%, #154C72 100%)',
           border: '2px solid #3498DB',
@@ -215,15 +309,27 @@ export default function GameBoard({
           width: '100%',
           maxWidth: 420,
           boxShadow: '0 0 30px rgba(52,152,219,0.3), 0 8px 32px rgba(0,0,0,0.4)',
+          position: 'relative',
+          zIndex: 1,
         }}>
           <h2 style={{
             color: '#FFFFFF', fontSize: 28, fontWeight: 800,
-            textAlign: 'center', marginBottom: 24,
+            textAlign: 'center', marginBottom: 8,
             fontFamily: "'Arial Black', sans-serif",
             textShadow: '0 2px 4px rgba(0,0,0,0.3)',
           }}>
-            סיכום משחק
+            {iWon ? '🎉 ניצחת! 🎉' : 'סיכום משחק'}
           </h2>
+          {iWon && (
+            <p style={{
+              color: '#FFD700', fontSize: 16, fontWeight: 700,
+              textAlign: 'center', marginBottom: 16,
+              textShadow: '0 1px 3px rgba(0,0,0,0.4)',
+            }}>
+              🏆 כל הכבוד! 🏆
+            </p>
+          )}
+          {!iWon && <div style={{ marginBottom: 16 }} />}
 
           <div style={{ marginBottom: 24 }}>
             {ranked.map((p, i) => (
@@ -300,6 +406,21 @@ export default function GameBoard({
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {/* Sound toggle */}
+          <button
+            onClick={handleSoundToggle}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: 18,
+              padding: '2px 4px',
+              opacity: 0.7,
+            }}
+            title={soundOn ? 'Mute sounds' : 'Enable sounds'}
+          >
+            {soundOn ? '🔊' : '🔇'}
+          </button>
           <span className="text-white/50 text-sm">{gameState.direction === 1 ? '→' : '←'}</span>
           {gameState.pendingDrawCount > 0 && (
             <span className="bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
@@ -336,7 +457,7 @@ export default function GameBoard({
         {/* Draw pile */}
         <div className="flex flex-col items-center gap-2">
           <button
-            onClick={onDrawCard}
+            onClick={handleDrawCard}
             disabled={!isMyTurn || (gameState.takiMode.active && gameState.takiMode.playerId === playerId)}
             className={`relative transition-all ${
               isMyTurn && !inMyTaki
